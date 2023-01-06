@@ -1,3 +1,5 @@
+from flask import request
+from flask_restful import Resource
 import json
 import pandas as pd
 import sqlite3
@@ -7,6 +9,14 @@ class FileManager:
     def __init__(self, db_name):
         self.db = sqlite3.connect(db_name)
         self.cursor = self.db.cursor()
+
+    def spotify(self):
+        credentials = request.get_json()
+        pd.DataFrame({
+            'client_id': credentials['client_id'],
+            'client_secret': credentials['client_secret'],
+        }).to_sql('spotify_credentials', self.db, if_exists='replace', index=False)
+        return {'message': 'Credentials saved.'}, 200
 
     def print_files(self):
         df = pd.DataFrame()
@@ -50,3 +60,16 @@ class FileManager:
         self.db.commit()
         return {'message': 'File deleted.'}, 200
 
+
+class Files(Resource):
+    def get(self, session_id=0):
+        f = FileManager('server_data.db')
+        return f.load_file(session_id) if session_id else f.print_files()
+
+    def put(self, session_id):
+        f = FileManager('server_data.db')
+        return f.spotify() if session_id == 'spotify_credentials' else f.save_file(session_id)
+
+    def delete(self, session_id):
+        f = FileManager('server_data.db')
+        return f.delete_file(session_id)

@@ -1,9 +1,7 @@
+from flask_restful import Resource
 import json
 import pandas as pd
 import sqlite3
-
-from server.common.genres import GenresSmasher
-
 
 class FeedManager:
     def __init__(self, db_name):
@@ -30,7 +28,6 @@ class FeedManager:
                     price, currency, tralbum_url, spotify, image
                 from "%s" """ % self.current_id
             df = pd.read_sql(query, self.db)
-            df = GenresSmasher(df).smash()
             return json.loads(df.to_json(orient='records')), 200
         else:
             return {'message': 'Unable to load content.'}, 204
@@ -47,35 +44,8 @@ class FeedManager:
         else:
             return {'message': 'Unable to load content.'}, 204
 
-# class Feed(Resource):
-#     def get(self, album_id=False):
-#         db = sqlite3.connect('server_data.db')
-#         current_id = 0
-#
-#         try:
-#             df = pd.read_sql_query('select * from meta_data where is_current = 1', db)
-#             current_id = df['fetch_id'].values[0]
-#         except pd.errors.DatabaseError as er:
-#             print(er)
-#         finally:
-#             if current_id:
-#                 if not album_id:
-#                     params = (current_id,)
-#                     query = """
-#                         select
-#                             tralbum_id, title, artist, published,
-#                             is_preorder, genres, band_name, label_origin,
-#                             price, currency, tralbum_url, spotify, image
-#                         from ? """
-#                 else:
-#                     params = (current_id, str(album_id))
-#                     query = """
-#                         select tralbum_id, tracks_num, album_description
-#                         from ?
-#                         where tralbum_id = ? """
-#
-#                 df = pd.read_sql_query(query, db, params=params)
-#                 df = GenresSmasher(df).smash() if not album_id else df
-#                 return Response(df.to_json(orient='records'), mimetype='application/json'), 200
-#             else:
-#                 return '', 204
+
+class Feed(Resource):
+    def get(self, album_id=False):
+        f = FeedManager('server_data.db')
+        return f.send_details(album_id) if album_id else f.send_all()
