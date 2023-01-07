@@ -66,9 +66,13 @@ class Files(Resource):
         f = FileManager('server_data.db')
         return f.load_file(session_id) if session_id else f.print_files()
 
+    def post(self):
+        f = FileManager('server_data.db')
+        return f.spotify()
+
     def put(self, session_id):
         f = FileManager('server_data.db')
-        return f.spotify() if session_id == 'spotify_credentials' else f.save_file(session_id)
+        return f.save_file(session_id)
 
     def delete(self, session_id):
         f = FileManager('server_data.db')

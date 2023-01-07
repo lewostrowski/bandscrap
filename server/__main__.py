@@ -15,13 +15,13 @@ api = Api(app)
 
 class Home(Resource):
     def get(self):
-        return {'name': 'kendama-open', 'server_status': 'guitar'}
+        return {'name': 'kendama-open', 'server_status': 'guitar'}, 200
 
 
 api.add_resource(Home, '/')
 api.add_resource(Feed, '/feed', '/feed/<int:album_id>', methods=['GET'])
 api.add_resource(Search, '/search', methods=['POST'])
-api.add_resource(Files, '/files', '/files/<string:session_id>', methods=['GET', 'DELETE', 'PUT'])
+api.add_resource(Files, '/files', '/files/<string:session_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
 
 if __name__ == '__main__':
     app.run(debug=True)
