@@ -19,10 +19,11 @@ class SearchEngine:
         self.spotify_enriched = []
 
     def bc_basic(self):
-        tags = self.search_query['sort']['tags'].split(',')
+        tags = self.search_query['tags'].split(',')
         tags = [t.strip().lower().replace(' ', '-') for t in tags]
         for i in range(1, self.search_query['depth'] + 1):
             response = 0
+            # body: '{"sort": "date", "format_": "all", "tags": ["ambient"]}'
             filter_dict = {"filters":
                                {"sort": self.search_query['sort'],
                                 "format": self.search_query['format_'],
@@ -108,6 +109,7 @@ class SearchEngine:
                     search_string = f'artist:{artist}+album:{title}+year:{year}'
                     search_full = f'https://api.spotify.com/v1/search?type=album&q={search_string}&limit=1'
 
+                    spotify_response = 0
                     try:
                         spotify_response = requests.get(search_full, headers=header)
                         spotify = json.loads(spotify_response.text)
@@ -116,7 +118,6 @@ class SearchEngine:
                         console = 'Fetching spotify info for album'
                         print('{} {} {}/{}'.format(time, console, len(self.spotify_enriched) + 1, len(self.enriched)))
                     except requests.exceptions.ConnectionError as e:
-                        spotify_response = 0
                         print(e)
                     finally:
                         if spotify_response:
@@ -151,52 +152,48 @@ class SearchEngine:
 class Search(Resource):
     def post(self):
         search = request.get_json()
+        engine = SearchEngine(search)
+        basic = engine.bc_basic()
 
-        # testing
-        for key in search:
-            print('Key: {}, val: {}, val type: {}'.format(key, search[key], type(search[key])))
-        # engine = SearchEngine(search)
-        # basic = engine.bc_basic()
-        #
-        # if basic:
-        #     advance = engine.bc_advance()
-        # else:
-        #     return {'message': 'Basic fetch failed.'}, 500
-        #
-        # if advance:
-        #     db = sqlite3.connect('server_data.db')
-        #     table_list = pd.read_sql('select name from sqlite_master where type="table"', db)['name']
-        # else:
-        #     return {'message': 'Advance fetch failed.'}, 500
-        #
-        # # Spotify.
-        # if search['spotify'] and 'spotify_credentials' in table_list:
-        #     credentials = pd.read_sql('select * from spotify_credentials', db).to_records()
-        #     sptf = engine.spotify(credentials)
-        # else:
-        #     sptf = 0
-        #
-        # meta = engine.create_meta()
-        # results = sptf if sptf else advance
-        #
-        # # Delete unsaved.
-        # if 'meta_data' in table_list:
-        #     cursor = db.cursor()
-        #
-        #     cursor.execute('update meta_data set is_current = 0 where is_current = 1')
-        #     not_saved = pd.read_sql_query('select fetch_id from meta_data where is_current = 0 and is_saved = 0', db)
-        #     for t in (not_saved['fetch_id']):
-        #         cursor.execute('drop table "%s"' % t)
-        #         cursor.execute('delete from meta_data where fetch_id = "%s"' % t)
-        #
-        # new_fetch = pd.DataFrame(results)
-        # for c in new_fetch.columns:
-        #     if new_fetch[c].dtypes == 'object':
-        #         new_fetch[c] = new_fetch[c].astype('string')
-        #
-        # new_fetch = GenresSmasher(new_fetch).smash()
-        # new_fetch.to_sql(meta['fetch_id'][0], db, if_exists='replace', index=False)
-        # pd.DataFrame(meta).to_sql('meta_data', db, if_exists='append', index=False)
-        # db.commit()
+        if basic:
+            advance = engine.bc_advance()
+        else:
+            return {'message': 'Basic fetch failed.'}, 500
+
+        if advance:
+            db = sqlite3.connect('server_data.db')
+            table_list = pd.read_sql('select name from sqlite_master where type="table"', db)['name']
+        else:
+            return {'message': 'Advance fetch failed.'}, 500
+
+        # Spotify.
+        if search['spotify'] and 'spotify_credentials' in table_list:
+            credentials = pd.read_sql('select * from spotify_credentials', db).to_records()
+            sptf = engine.spotify(credentials)
+        else:
+            sptf = 0
+
+        meta = engine.create_meta()
+        results = sptf if sptf else advance
+
+        # Delete unsaved.
+        if 'meta_data' in table_list:
+            cursor = db.cursor()
+
+            cursor.execute('update meta_data set is_current = 0 where is_current = 1')
+            not_saved = pd.read_sql_query('select fetch_id from meta_data where is_current = 0 and is_saved = 0', db)
+            for t in (not_saved['fetch_id']):
+                cursor.execute('drop table "%s"' % t)
+                cursor.execute('delete from meta_data where fetch_id = "%s"' % t)
+
+        new_fetch = pd.DataFrame(results)
+        for c in new_fetch.columns:
+            if new_fetch[c].dtypes == 'object':
+                new_fetch[c] = new_fetch[c].astype('string')
+
+        new_fetch = GenresSmasher(new_fetch).smash()
+        new_fetch.to_sql(meta['fetch_id'][0], db, if_exists='replace', index=False)
+        pd.DataFrame(meta).to_sql('meta_data', db, if_exists='append', index=False)
+        db.commit()
 
         return {'message': 'Fetch success.'}, 200

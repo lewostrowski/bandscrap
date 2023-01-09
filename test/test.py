@@ -1,11 +1,11 @@
 import argparse
 from colorama import Fore, Style
+from scenario import Scenario
 import requests
 
 
 def console_decorator(func):
     def wrapper(*args, **kwargs):
-        print('====================')
         code, results = func(*args, **kwargs)
 
         if code == 200:
@@ -103,6 +103,7 @@ if __name__ == '__main__':
     parser.add_argument('-d', help='Send DELETE request to specific endpoint.')
     parser.add_argument('-u', help='Send PUT request to specific endpoint.')
     parser.add_argument('-b', help='Json body to send.')
+    parser.add_argument('-s', action='store_true', help='Conduct scenario from cvs file.')
     args = parser.parse_args()
 
     unit = TestApi('http://127.0.0.1:5000')
@@ -118,5 +119,22 @@ if __name__ == '__main__':
         unit.put(link=args.u)
     elif args.p and args.b:
         unit.post(link=args.p, data=args.b)
+    elif args.s:
+        schema = Scenario.schema
+
+        for scene in schema:
+            if isinstance(scene, list):
+                for s in scene:
+                    print(Style.BRIGHT + '========{}======='.format(str(s)) + Style.RESET_ALL)
+                    if s[0] == 'GET':
+                        unit.get(s[1])
+                    elif s[0] == 'POST':
+                        unit.post(s[1], s[3])
+                    elif s[0] == 'DELETE':
+                        unit.delete(s[1])
+                    elif s[0] == 'PUT':
+                        unit.put(s[1])
+
+
 
 

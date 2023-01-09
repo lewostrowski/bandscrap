@@ -3,9 +3,10 @@ from flask_cors import CORS
 from flask_restful import Resource, Api
 from uuid import uuid4
 
-from .resources.send_feed import Feed
-from .resources.files_operation import Files
-from .resources.search_engine import Search
+from .resources.feedlib import Feed
+from .resources.filelib import Files
+from .resources.searchlib import Search
+from .resources.spotifylib import Spotify
 
 app = Flask(__name__)
 app.secret_key = str(uuid4())
@@ -21,7 +22,8 @@ class Home(Resource):
 api.add_resource(Home, '/')
 api.add_resource(Feed, '/feed', '/feed/<int:album_id>', methods=['GET'])
 api.add_resource(Search, '/search', methods=['POST'])
-api.add_resource(Files, '/files', '/files/<string:session_id>', methods=['GET', 'POST', 'DELETE', 'PUT'])
+api.add_resource(Spotify, '/spotify', methods=['GET', 'POST', 'DELETE'])
+api.add_resource(Files, '/files', '/files/<string:session_id>', methods=['GET', 'DELETE', 'PUT'])
 
 if __name__ == '__main__':
     app.run(debug=True)
