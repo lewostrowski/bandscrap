@@ -35,7 +35,7 @@ class FeedManager:
     def send_details(self, album_id):
         if self.current_id:
             query = """
-                select tralbum_id, tracks_num, album_description
+                select tralbum_id, tracks_num, dsc
                 from "%s"
                 where tralbum_id=:album_id """ % self.current_id
 

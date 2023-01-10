@@ -19,22 +19,23 @@ class SearchEngine:
         self.spotify_enriched = []
 
     def bc_basic(self):
-        tags = self.search_query['tags'].split(',')
-        tags = [t.strip().lower().replace(' ', '-') for t in tags]
+        fin_responses = []
+        tags = [t.strip().lower().replace(' ', '-') for t in self.search_query['tags'].split(',')]
         for i in range(1, self.search_query['depth'] + 1):
             response = 0
-            # body: '{"sort": "date", "format_": "all", "tags": ["ambient"]}'
+            api_link = 'https://bandcamp.com/api/hub/2/dig_deeper'
+            # body: '{"sort": "date", "type_": "all", depth: 1, "tags": "ambient, drone"}'
             filter_dict = {"filters":
                                {"sort": self.search_query['sort'],
-                                "format": self.search_query['format_'],
+                                "format": self.search_query['type_'],
                                 "tags": tags,
                                 "location": 0},
                            "page": i}
 
             try:
-                response = requests.post('https://bandcamp.com/api/hub/2/dig_deeper', data=filter_dict)
+                response = requests.post(api_link, data=json.dumps(filter_dict))
                 time = datetime.now().strftime('%H:%M:%S')
-                print('{} Fetching page: {}/{}'.format(time, str(i), str(self.search_query['depth'] + 1)))
+                print('{} Fetching page: {}/{}'.format(time, str(i), str(self.search_query['depth'])))
             except requests.exceptions.ConnectionError as e:
                 print(e)
             finally:
@@ -44,11 +45,17 @@ class SearchEngine:
                         search = ['title', 'artist', 'band_name', 'is_preorder', 'tralbum_url', 'tralbum_id']
                         album_dict = {attr: album[attr] for attr in search}
                         self.fetch.append(album_dict)
-                    return 1
+                    fin_responses.append(1)
                 else:
-                    return response
+                    fin_responses.append(0)
+
+        if 0 in fin_responses:
+            return 0
+        else:
+            return 1
 
     def bc_advance(self):
+        fin_responses = []
         for album in self.fetch:
             response = 0
 
@@ -77,9 +84,14 @@ class SearchEngine:
                     }
                     album.update(album_enrichment)
                     self.enriched.append(album)
-                    return 1
+                    fin_responses.append(1)
                 else:
-                    return response
+                    fin_responses.append(0)
+
+        if 0 in fin_responses:
+            return 0
+        else:
+            return 1
 
     def spotify(self, credentials):
         header = 0
@@ -112,8 +124,6 @@ class SearchEngine:
                     spotify_response = 0
                     try:
                         spotify_response = requests.get(search_full, headers=header)
-                        spotify = json.loads(spotify_response.text)
-
                         time = datetime.now().strftime('%H:%M:%S')
                         console = 'Fetching spotify info for album'
                         print('{} {} {}/{}'.format(time, console, len(self.spotify_enriched) + 1, len(self.enriched)))
@@ -121,8 +131,10 @@ class SearchEngine:
                         print(e)
                     finally:
                         if spotify_response:
-                            s_url = spotify['albums']['items'][0]['external_urls']['spotify']
-                            album.update({'spotify': s_url})
+                            spotify = json.loads(spotify_response.text)['albums']['items']
+                            if spotify:
+                                s_url = spotify[0]['external_urls']['spotify']
+                                album.update({'spotify': s_url})
 
                         self.spotify_enriched.append(album)
 
@@ -132,10 +144,9 @@ class SearchEngine:
 
     def create_meta(self):
         fetch_id = str(uuid4()).replace('-', '')
-        time = datetime.now().strftime('%H:%M:%S')
+        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         items_num = len(self.enriched)
-        tags = self.search_query['sort']['tags'].split(',')
-        tags = [t.strip().lower().replace(' ', '-') for t in tags]
+        tags = [t.strip().lower().replace(' ', '-') for t in self.search_query['tags'].split(',')]
         return {
             'fetch_id': [fetch_id],
             'fetch_date': [time],
@@ -167,17 +178,17 @@ class Search(Resource):
             return {'message': 'Advance fetch failed.'}, 500
 
         # Spotify.
-        if search['spotify'] and 'spotify_credentials' in table_list:
-            credentials = pd.read_sql('select * from spotify_credentials', db).to_records()
-            sptf = engine.spotify(credentials)
+        if search['spotify'] and 'spotify_credentials' in set(table_list):
+            credentials = pd.read_sql('select * from spotify_credentials', db).to_records(index=False)
+            sptf = engine.spotify(credentials[0])
         else:
             sptf = 0
 
         meta = engine.create_meta()
-        results = sptf if sptf else advance
+        results = engine.spotify_enriched if sptf else engine.enriched
 
         # Delete unsaved.
-        if 'meta_data' in table_list:
+        if 'meta_data' in set(table_list):
             cursor = db.cursor()
 
             cursor.execute('update meta_data set is_current = 0 where is_current = 1')
