@@ -6,8 +6,9 @@ import sqlite3
 
 
 class SpotifyManager:
-    def __init__(self, db_name):
+    def __init__(self, db_name, user):
         self.db = sqlite3.connect(db_name)
+        self.user = user
         self.cursor = self.db.cursor()
 
     def save_credentials(self):
@@ -16,14 +17,16 @@ class SpotifyManager:
         pd.DataFrame({
             'client_id': [credentials['client_id']],
             'client_secret': [credentials['client_secret']],
-            'time': [time]
+            'time': [time],
+            'user': [self.user]
         }).to_sql('spotify_credentials', self.db, if_exists='replace', index=False)
         return {'message': 'Credentials saved.'}, 200
 
     def info_credentials(self):
         df = pd.DataFrame()
         try:
-            df = pd.read_sql('select * from spotify_credentials', self.db)
+            query = 'select * from spotify_credentials where user=:user'
+            df = pd.read_sql(query, self.db, params={'user': self.user})
         except pd.errors.DatabaseError as er:
             print(er)
         finally:
@@ -36,7 +39,7 @@ class SpotifyManager:
     def delete_credentials(self):
         success = 0
         try:
-            self.cursor.execute('drop table spotify_credentials')
+            self.cursor.execute('delete from spotify_credentials where user=:user', (self.user,))
             self.db.commit()
             success = 1
         except Exception as er:
@@ -49,14 +52,14 @@ class SpotifyManager:
 
 
 class Spotify(Resource):
-    def get(self):
-        s = SpotifyManager('server_data.db')
+    def get(self, user):
+        s = SpotifyManager('server_data.db', user)
         return s.info_credentials()
 
-    def post(self):
-        s = SpotifyManager('server_data.db')
+    def post(self, user):
+        s = SpotifyManager('server_data.db', user)
         return s.save_credentials()
 
-    def delete(self):
-        s = SpotifyManager('server_data.db')
+    def delete(self, user):
+        s = SpotifyManager('server_data.db', user)
         return s.delete_credentials()

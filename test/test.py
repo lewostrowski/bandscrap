@@ -1,6 +1,5 @@
 import argparse
 from colorama import Fore, Style
-from scenario import Scenario
 import requests
 
 

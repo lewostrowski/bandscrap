@@ -4,15 +4,17 @@ import pandas as pd
 import sqlite3
 
 class FeedManager:
-    def __init__(self, db_name):
+    def __init__(self, db_name, user):
         self.db = sqlite3.connect(db_name)
+        self.user = user
         self.current_id = 0
         self.check_current()
 
     def check_current(self):
         check = 0
         try:
-            df = pd.read_sql('select * from meta_data where is_current = 1', self.db)
+            query = 'select * from meta_data where is_current=1 and user=:user'
+            df = pd.read_sql(query, self.db, params={'user': self.user})
             check = df['fetch_id'].values[0]
         except pd.errors.DatabaseError as er:
             print(er)
@@ -46,6 +48,6 @@ class FeedManager:
 
 
 class Feed(Resource):
-    def get(self, album_id=False):
-        f = FeedManager('server_data.db')
+    def get(self, user, album_id=False):
+        f = FeedManager('server_data.db', user)
         return f.send_details(album_id) if album_id else f.send_all()

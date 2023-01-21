@@ -12,8 +12,9 @@ from server.common.genres import GenresSmasher
 
 
 class SearchEngine:
-    def __init__(self, search_query):
+    def __init__(self, search_query, user):
         self.search_query = search_query
+        self.user = user
         self.fetch = []
         self.enriched = []
         self.spotify_enriched = []
@@ -158,12 +159,13 @@ class SearchEngine:
             'sort': [self.search_query['sort']],
             'type': [self.search_query['type_']],
             'spotify_search': [self.search_query['spotify']],
+            'user': [self.user]
         }
 
 class Search(Resource):
-    def post(self):
+    def post(self, user):
         search = request.get_json()
-        engine = SearchEngine(search)
+        engine = SearchEngine(search, user)
         basic = engine.bc_basic()
 
         if basic:
@@ -179,7 +181,8 @@ class Search(Resource):
 
         # Spotify.
         if search['spotify'] and 'spotify_credentials' in set(table_list):
-            credentials = pd.read_sql('select * from spotify_credentials', db).to_records(index=False)
+            query = 'select * from spotify_credentials where user=:user'
+            credentials = pd.read_sql(query, db, params={'user': user}).to_records(index=False)
             sptf = engine.spotify(credentials[0])
         else:
             sptf = 0
@@ -191,11 +194,11 @@ class Search(Resource):
         if 'meta_data' in set(table_list):
             cursor = db.cursor()
 
-            cursor.execute('update meta_data set is_current = 0 where is_current = 1')
-            not_saved = pd.read_sql_query('select fetch_id from meta_data where is_current = 0 and is_saved = 0', db)
+            cursor.execute('update meta_data set is_current=0 where is_current=1 and user=?', (user,))
+            not_saved = pd.read_sql_query('select fetch_id from meta_data where is_current=0 and is_saved=0', db)
             for t in (not_saved['fetch_id']):
                 cursor.execute('drop table "%s"' % t)
-                cursor.execute('delete from meta_data where fetch_id = "%s"' % t)
+                cursor.execute('delete from meta_data where fetch_id="%s"' % t)
 
         new_fetch = pd.DataFrame(results)
         for c in new_fetch.columns:
