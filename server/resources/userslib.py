@@ -39,8 +39,8 @@ class UsersManager:
 
 class Users(Resource):
     # User is created after it's first search.
-    def get(self):
-        u = UsersManager('server_data.db', None)
+    def get(self, user=None):
+        u = UsersManager('server_data.db', user)
         return u.print_users()
 
     def delete(self, user):

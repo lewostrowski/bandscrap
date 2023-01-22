@@ -5,16 +5,17 @@ import sqlite3
 
 
 class FileManager:
-    def __init__(self, db_name):
+    def __init__(self, db_name, user):
         self.db = sqlite3.connect(db_name)
+        self.user = user
         self.cursor = self.db.cursor()
 
     def check_session(self, session_id):
         check = 0
         try:
-            df = pd.read_sql('select fetch_id from meta_data where fetch_id=:session',
+            df = pd.read_sql('select fetch_id from meta_data where fetch_id=:session and user=:user',
                              self.db,
-                             params={'session': session_id})
+                             params={'session': session_id, 'user': self.user})
             check = df['fetch_id'].values[0]
         except pd.errors.DatabaseError as er:
             print(er)
@@ -24,7 +25,7 @@ class FileManager:
     def print_files(self):
         df = pd.DataFrame()
         try:
-            df = pd.read_sql('select * from meta_data', self.db)
+            df = pd.read_sql('select * from meta_data where user=:user', self.db, params={'user': self.user})
         except pd.errors.DatabaseError as er:
             print(er)
         finally:
@@ -36,7 +37,7 @@ class FileManager:
     def load_file(self, session_id):
         # Clear current.
         if self.check_session(session_id):
-            self.cursor.execute('update meta_data set is_current=0 where is_current=1')
+            self.cursor.execute('update meta_data set is_current=0 where is_current=1 and user=?', (self.user,))
 
             # Drop unsaved.
             to_remove = pd.read_sql('select fetch_id from meta_data where is_current=0 and is_saved=0', self.db)
@@ -72,14 +73,14 @@ class FileManager:
 
 
 class Files(Resource):
-    def get(self, session_id=0):
-        f = FileManager('server_data.db')
+    def get(self, user, session_id=0):
+        f = FileManager('server_data.db', user)
         return f.load_file(session_id) if session_id else f.print_files()
 
-    def put(self, session_id):
-        f = FileManager('server_data.db')
+    def put(self, user, session_id):
+        f = FileManager('server_data.db', user)
         return f.save_file(session_id)
 
-    def delete(self, session_id):
-        f = FileManager('server_data.db')
+    def delete(self, user, session_id):
+        f = FileManager('server_data.db', user)
         return f.delete_file(session_id)

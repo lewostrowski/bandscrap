@@ -162,9 +162,12 @@ class SearchEngine:
             'user': [self.user]
         }
 
+
 class Search(Resource):
-    def post(self, user):
+    def post(self):
         search = request.get_json()
+        print(search)
+        user = search['user']
         engine = SearchEngine(search, user)
         basic = engine.bc_basic()
 
